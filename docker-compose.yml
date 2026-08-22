@@ -1,0 +1,46 @@
+services:
+  mysql:
+    image: mysql:8.4
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: chat_app
+      MYSQL_ROOT_PASSWORD: change-me
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./Server/database/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-pchange-me"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  server:
+    build: ./Server
+    restart: unless-stopped
+    environment:
+      PORT: 5001
+      DB_HOST: mysql
+      DB_USER: root
+      DB_PASSWORD: change-me
+      DB_NAME: chat_app
+      JWT_SECRET: replace-with-a-long-random-secret
+      CLIENT_ORIGIN: http://localhost
+    depends_on:
+      mysql:
+        condition: service_healthy
+    ports:
+      - "5001:5001"
+
+  client:
+    build:
+      context: ./Client
+      args:
+        VITE_API_URL: http://localhost:5001
+    restart: unless-stopped
+    depends_on:
+      - server
+    ports:
+      - "80:80"
+
+volumes:
+  mysql_data:
